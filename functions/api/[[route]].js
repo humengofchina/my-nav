@@ -1,7 +1,7 @@
 // Cloudflare Pages Function: /api/*
 // 现代化全功能 API 引擎，基于 Cloudflare KV 实现持久化存储
 
-import { initialMenus, initialCards, initialFriends, initialAds } from '../seedData.js';
+import { initialMenus, initialCards, initialFriends, initialAds, initialSettings } from '../seedData.js';
 
 // ==================== CORS 配置 ====================
 const corsHeaders = {
@@ -231,6 +231,7 @@ async function ensureInitialized(storage, env) {
     await storage.put('nav:cards', initialCards);
     await storage.put('nav:friends', initialFriends);
     await storage.put('nav:ads', initialAds);
+    await storage.put('nav:settings', initialSettings);
     await storage.put('nav:users', [
       {
         id: 1,
@@ -240,6 +241,7 @@ async function ensureInitialized(storage, env) {
         last_login_ip: null
       }
     ]);
+    await storage.put('nav:settings', initialSettings);
     await storage.put('nav:meta', {
       nextMenuId: 100,
       nextSubMenuId: 100,
@@ -895,6 +897,30 @@ export async function onRequest(context) {
   }
 
   // ----------------------------------------------------
+  // 站点与背景设置接口: /api/settings
+  // ----------------------------------------------------
+  if (path === 'settings' && method === 'GET') {
+    const settings = await storage.get('nav:settings') || initialSettings;
+    return json(settings);
+  }
+
+  if (path === 'settings' && method === 'PUT') {
+    const user = await authenticate(request, env);
+    if (!user) return error('未授权', 401);
+
+    const body = await request.json();
+    const current = await storage.get('nav:settings') || { ...initialSettings };
+
+    if (body.footerText !== undefined) current.footerText = body.footerText;
+    if (body.footerLinkText !== undefined) current.footerLinkText = body.footerLinkText;
+    if (body.footerLinkUrl !== undefined) current.footerLinkUrl = body.footerLinkUrl;
+    if (body.backgroundUrl !== undefined) current.backgroundUrl = body.backgroundUrl;
+
+    await storage.put('nav:settings', current);
+    return json({ success: true, settings: current });
+  }
+
+  // ----------------------------------------------------
   // 数据备份与恢复接口: /api/backup/*
   // ----------------------------------------------------
   if (path === 'backup/export' && method === 'GET') {
@@ -905,6 +931,7 @@ export async function onRequest(context) {
     const cards = await storage.get('nav:cards') || [];
     const friends = await storage.get('nav:friends') || [];
     const ads = await storage.get('nav:ads') || [];
+    const settings = await storage.get('nav:settings') || initialSettings;
 
     return json({
       version: '1.0',
@@ -912,7 +939,8 @@ export async function onRequest(context) {
       menus,
       cards,
       friends,
-      ads
+      ads,
+      settings
     });
   }
 
@@ -926,6 +954,7 @@ export async function onRequest(context) {
       if (Array.isArray(data.cards)) await storage.put('nav:cards', data.cards);
       if (Array.isArray(data.friends)) await storage.put('nav:friends', data.friends);
       if (Array.isArray(data.ads)) await storage.put('nav:ads', data.ads);
+      if (data.settings && typeof data.settings === 'object') await storage.put('nav:settings', data.settings);
       return json({ success: true, message: '数据导入成功' });
     } catch (e) {
       return error('导入失败: ' + e.message, 400);

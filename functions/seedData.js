@@ -761,3 +761,11 @@ export const initialFriends = [
 ];
 
 export const initialAds = [];
+
+
+export const initialSettings = {
+  footerText: 'Copyright © 2025 Nav-Item | ',
+  footerLinkText: 'Powered by eooce',
+  footerLinkUrl: 'https://github.com/eooce/Nav-Item',
+  backgroundUrl: '/background.webp'
+};
